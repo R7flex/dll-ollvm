@@ -174,4 +174,4 @@ SDK needs `LLVM_EXPORT_SYMBOLS_FOR_PLUGINS=ON`. On Windows link the plugin again
 
 ---
 
-README ve `scripts/` yapay zeka ile oluşturulmuştur. Kendinize göre ayarlayabilirsiniz.
+README and `scripts/` were generated with AI. Adjust them to your own setup.
