@@ -12,13 +12,36 @@ Tested on **manually mapped DLLs** (injectors that only do reloc / optional IAT 
 
 Passes run on IR before codegen. The PE itself is not patched afterward.
 
-| Pass | name |
-|------|------|
-| Instruction substitution | `tess-sub` |
-| Bogus control flow | `tess-bcf` |
-| Control-flow flattening | `tess-fla` |
-| Strip ctors / dead locals | `tess-trim` |
-| All | `tess-obf` |
+Preset `tess-obf` runs them in order: **sub → bcf → fla → trim**.
+
+## Passes
+
+### `tess-sub` — instruction substitution
+
+Rewrites integer `add` / `sub` / `xor` / `and` / `or` into equivalent MBA-style forms, e.g. `a+b` → `(a^b)+2*(a&b)` or `a-(~b)-1`. Same result, uglier IR/asm. Skips vectors, floats, and non-binops. Probability / budget knobs: `tess-sub-prob` (default ~55%), capped ops per function.
+
+### `tess-bcf` — bogus control flow
+
+Splits real blocks and inserts an opaque predicate that is always true (`x*(x+1)` even → dead false edge). False edge goes into a junk loop that never runs. Graph looks branched; real path is still linear. Skips `DllMain` / protected entries, EH, tiny blocks. Knobs: `tess-bcf-prob`, `tess-bcf-max`.
+
+### `tess-fla` — control-flow flattening
+
+Turns the function into a state-machine dispatcher: each original block gets a random state id, terminators store the next state and jump to a central switch loop. Switches are lowered to icmp chains first; PHIs / escaping regs are demoted to stack so the rewrite stays valid. Skips EH, naked, tiny functions, and (by default) `DllMain`. Very large functions (>~4000 inst) are skipped. Opt-in: `tess-fla-entry` to also flatten protected entries.
+
+### `tess-trim` — size / map helpers
+
+1. Deletes `llvm.global_ctors` and `llvm.global_dtors` so the PE does not expect loader CRT init (manual map).
+2. Drops unused `internal` functions / globals.
+
+Does **not** encrypt strings. Does **not** shrink by rewriting algorithms — it only removes ctor lists and dead locals.
+
+### Markers (all passes)
+
+| annotate | effect |
+|----------|--------|
+| `tess_skip` | Never touch this function |
+| `tess_protect` | Treat like entry (stronger prefs; fla still off unless `tess-fla-entry`) |
+| `tess_obf` | Force when using annotated-only mode |
 
 ### Example (decompiled)
 
@@ -148,3 +171,7 @@ cmake --build build --config Release
 SDK needs `LLVM_EXPORT_SYMBOLS_FOR_PLUGINS=ON`. On Windows link the plugin against `opt.lib`.
 
 `scripts/` is optional local tooling.
+
+---
+
+README ve `scripts/` yapay zeka ile oluşturulmuştur. Kendinize göre ayarlayabilirsiniz.
